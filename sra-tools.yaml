@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sra-tools
+  labels:
+    app: sra-tools
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sra-tools
+  template:
+    metadata:
+      labels:
+        app: sra-tools
+    spec:
+      containers:
+      - name: sra-tools
+        imagePullPolicy: Always
+        image: ncbi/sra-tools
+        command: [ "/bin/sh" ]
+        args: [ "-c", "apk update && apk upgrade && apk add --no-cache util-linux bash && tail -f /dev/null" ]
+        resources:
+          requests:
+            cpu: 1
+            memory: 4Gi
+          limits:
+            cpu: 1
+            memory: 4Gi
+        volumeMounts:
+        - name: sra-tools-volume
+          mountPath: /workspace
+      restartPolicy: Always
+      volumes:
+        - name: sra-tools-volume
+          persistentVolumeClaim:
+            claimName: deepgtex-prp # Enter valid PVC
