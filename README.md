@@ -6,7 +6,7 @@ Computational genomics has become a core toolkit in the study of biological syst
 The Demo:
 
 We will cover the complete deployment life cycle that enables scientific workflows to be run in the cloud. This includes:
- - Deployment of a Kubernetes(K8s) cluster using Cisco Container Platform(CCP). 
+ - Deployment/Access to a Kubernetes(K8s) cluster using Cisco Container Platform(CCP). 
  - Creating a persistent NFS server to store workflow data, then loading a Gene Expression Matrix(GEM) onto it.
  - Deploying Knowledge Independent Network Construction(KINC), a genomic workflow, to the K8s cloud.
  - Downloading the resulting Gene Coexpression Network(GCN) from the NFS server, then visualizing the network.
@@ -14,18 +14,18 @@ We will cover the complete deployment life cycle that enables scientific workflo
 ## 0. Prerequisites(BOTH SESSIONS)
 
 The following software is necessary to participate in the demo:
+ - helm
  - Cisco Container Platform CLI
- - Helm - Kubernetes Package Management Utility
  - kubectl - Kubernetes CLI 
  - Nextflow - Workflow Manager
  - Java
  - Files/scripts from this repo.
 
-To streamline the demo, all software has been packaged into a virtual machine that has been replicated for each user. 
+To streamline the workshop, all software has been packaged into a virtual machine that has been replicated for each user. 
 
-An additional requirement is access to the CCP environment where the K8s clusters will be created.
+An additional requirement is access to the kubernetes clusters that will be used for the workshop.
 
-**If you do not have your CCP login credentials and access to your personal VM, please let us know.**
+**If you do not have your CCP cluster credentials(kubeconfig) and access to your personal VM, please let us know.**
 
 ### Access Praxis
 
@@ -49,59 +49,45 @@ Finally, please clone this repo to a folder with persistent storage:
 
 In this session we will cover Kubernetes cluster creation and usage, while also performing genomic analysis on human RNA sequences. 
 
-## 1. Deploy Kubernertes Cluster Using Cisco Container Platform
+## 1. Access Kubernertes Cluster
 
-There are two ways to use CCP: the web GUI and command line interface.
+Download or copy/paste the kubeconfig you were provided to a file named `config`.
 
-For this workshop, we will use the CLI. Instructions for using the web interface are below. 
+Move the kubeconfig to your .kube folder: 
 
-### Create a K8s Cluster Using the CCP Command Line Interface
+`mv config.yaml ~/.kube`
 
-There should be an open terminal on the VM that is already running the CCP CLI environment.
+`chmod 600 ~/.kube/config`
 
-**If there is not a CCP CLI terminal open, or you closed the terminal, run the following in a new terminal:**
-
-`cd Desktop/ccp_cli`
-
-`source venv/bin/activate`
-
-This will activate the CCP CLI environment.
-
-We will create a Kubernetes cluster with 1 master node and 3 workers. Give the cluster the same name as your CCP username, or *workshopX*
-
-To create the cluster, run:
-
-`ccp create cluster -name <CCP_Username> -master 1 -m-mem 32768 -worker 3 -w-mem 32768 -vcpu 4 -load 1
-
-The command should run until your cluster has been created.
-
-Next, run `ccp cluster list` to list the clusters, find your cluster and copy the UUID.
-
-To download the kubeconfig for your cluster, run:
-
-`ccp create kubeconfig -uuid <UUID> -file kubeconfig`
-
-Finally, move the kubeconfig to your .kube folder: 
-
-`mv kubeconfig.yaml ~/.kube`
-
-You now have access to your own personal K8s cluster!
-
-## 2. Create Persistant Data Storage to Host Workflow Data
-
-Now that you have a K8s cluster, it is time to access it from the VM.
-
-First, tell the VM where to look for the Kubernetes configuration file:
-
-`echo 'export KUBECONFIG=~/Downloads/kubeconfig.yaml' >> ~/.bashrc && source ~/.bashrc`
-
-Test your connection with:
+Confirm your cluster name:
 
 `kubectl config current-context`
 
 The output should match the name of your cluster.
 
-Now it is time to provision a NFS server to store workflow data. We will streamline this process by using Helm.
+You now have access to your K8s cluster!
+
+Issue an API call to view current pods(containers) that are deployed:
+
+`kubectl get pods`
+
+## 2. Create Persistant Data Storage to Host Workflow Data
+
+Now it is time to provision a NFS server to store workflow data. We will streamline this process by using Helm. Helm is a kubernetes package manager!
+
+Install Helm:
+
+`cd PATH`
+
+`wget https://get.helm.sh/helm-v3.6.0-linux-amd64.tar.gz`
+
+`tar -xvf helm-v3.6.0-linux-amd64.tar.gz`
+
+`sudo cp linux-amd64/helm /usr/local/bin`
+
+Add the `stable` repo:
+
+`helm repo add stable https://charts.helm.sh/stable`
 
 Update Helm's repositories(similar to `apt-get update)`:
 
@@ -111,7 +97,7 @@ Next, install a NFS provisioner onto the K8s cluster to permit dynamic provisoni
 
 `helm install kf stable/nfs-server-provisioner \`
 
-`--set=persistence.enabled=true,persistence.storageClass=standard,persistence.size=50Gi`
+`--set=persistence.enabled=true,persistence.storageClass=standard,persistence.size=52Gi`
 
 Check that the `nfs` storage class exists:
 
@@ -127,11 +113,22 @@ Check that the PVC was deployed successfully:
 
 `kubectl get pvc`
 
+Give Nextflow the necessary permissions to deploy jobs to your K8s cluster:
+
+```
+kubectl create rolebinding default-edit --clusterrole=edit --serviceaccount=default:default 
+kubectl create rolebinding default-view --clusterrole=view --serviceaccount=default:default
+```
+
 Finally, login to the PVC to get a shell, enabling you to view and manage files:
 
 `nextflow kuberun login -v task-pv-claim`
 
-## 3. Deploy a container to pull genomic data:
+**This tab now on your cluster's persistent filesystem.** 
+
+**To continue, open a new tab with File -> New -> Terminal**
+
+## 3. Deploy a Container to Pull Genomic Data
 
 Navigate to the *yamls* directory and deploy the sra-tools container:
 
@@ -151,24 +148,67 @@ Once inside the pod, navigate to the persistent directory `/workspace`:
 
 Initialize SRA-Tools:
 
-`vdb-config --interactive`
+`printf '/LIBS/GUID = "%s"\n' `uuidgen` > /root/.ncbi/user-settings.mkfg`
 
-Pull the sequence: `fasterq-dump -S SRR5139429`
+Pull the sequence: `fasterq-dump --split-files SRR5139429`
 
-## 4. Deploy a Genomic Workflow to Your Cloud
+**While the file is downloading, switch tabs to your other terminal.**
 
-**In a new terminal window....**
 
-Go to the **techex-demo** folder:
+## 4. Configure GEMmaker 
 
-`cd ~/Downloads/techex-demo`
+**On the cluster's filesystem....**
 
-Give Nextflow the necessary permissions to deploy jobs to your K8s cluster:
+We can now start creating the input directory structure:
 
-```
-kubectl create rolebinding default-edit --clusterrole=edit --serviceaccount=default:default 
-kubectl create rolebinding default-view --clusterrole=view --serviceaccount=default:default
-```
+Create a workflow directory in `/workspace`:
+
+`mkdir -p /workspace/gm-<YOUR_NAME>` 
+
+Install git in your container and download the workflow:
+
+`apk add --no-cache git`
+
+`git clone https://github.com/SystemsGenetics/GEMmaker.git`
+
+Copy the GEMmaker input folder to your workflow directory:
+
+`cp -R GEMmaker/input /workspace/gm-<YOUR_NAME>`
+
+Move the sequence into the input folder:
+
+`mv /workspace/gm-<YOUR_NAME>/SRR5139429_* /workspace/gm-<YOUR_NAME>/input`
+
+**Switch tabs**
+
+## 4. Deploy GEMmaker
+
+**On your local VM's filesystem....**
+
+Clone GEMmaker and edit the nextflow.config file:
+
+`git clone https://github.com/SystemsGenetics/GEMmaker.git`
+
+`nano GEMmaker/nextflow.config`
+
+Change the `input_dir` and `reference_dir` to `/workspace/gm-<YOUR_NAME>/input` and `/workspace/gm-<YOUR_NAME>/input/references`. 
+
+Deploy GEMmaker using `nextflow-kuberun`:
+
+`nextflow kuberun systemsgenetics/kinc-nf -v task-pv-claim` -C GEMmaker/nextflow.config
+
+
+
+
+
+
+
+
+
+
+# Session 2
+
+## 1. Deploy KINC
 
 Load the input data onto the PVC:
 
@@ -180,7 +220,7 @@ Deploy KINC using `nextflow-kuberun`:
 
 **The workflow should take about 10-15 minutes to execute.**
 
-### 5. Retreive and Visualize Gene Co-expression Network
+## 5. Retreive and Visualize Gene Co-expression Network
 
 Copy the output of KINC from the PVC to your VM:
 
