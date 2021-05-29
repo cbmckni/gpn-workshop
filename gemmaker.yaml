@@ -1,16 +1,16 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: sra-tools-<YOUR_NAME>
+  name: gm-<YOUR_NAME>
   labels:
-    app: sra-tools-<YOUR_NAME>
+    app: gm-<YOUR_NAME>
 spec:
   containers:
-  - name: sra-tools-<YOUR_NAME>
+  - name: gm-<YOUR_NAME>
     imagePullPolicy: Always
-    image: ncbi/sra-tools
+    image: systemsgenetics/gemmaker
     command: [ "/bin/sh" ]
-    args: [ "-c", "apk update && apk upgrade && apk add --no-cache util-linux bash && tail -f /dev/null" ]
+    args: [ "-c", "COMMAND" ]
     resources:
       requests:
         cpu: 1
@@ -19,10 +19,10 @@ spec:
         cpu: 1
         memory: 4Gi
     volumeMounts:
-    - name: sra-tools-volume
+    - name: gm-volume
       mountPath: /workspace
   restartPolicy: Always
   volumes:
-    - name: sra-tools-volume
+    - name: gm-volume
       persistentVolumeClaim:
-        claimName: task-pv-claim # Enter valid PVC
+        claimName: task-pv-claim-<YOUR_NAME> # Enter valid PVC

@@ -1,7 +1,7 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: task-pv-claim
+  name: task-pv-claim-<YOUR_NAME>
 spec:
   storageClassName: nfs
   accessModes:
