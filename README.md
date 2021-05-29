@@ -163,6 +163,10 @@ spec:
   containers:
   - name: sra-tools-<YOUR_NAME>
 ```
+```
+      persistentVolumeClaim:
+        claimName: task-pv-claim-<YOUR_NAME> # Enter valid PVC
+```
 
 Deploy the sra-tools container:
 
@@ -194,6 +198,16 @@ Pull the sequence: `fasterq-dump --split-files SRR5139429`
 
 ## 4. Configure GEMmaker 
 
+**On the cluster....**
+
+Create a folder for your workflow and input:
+
+`mkdir -p /workspace/gm-<YOUR_NAME>/input && cd /workspace/gm-<YOUR_NAME>/input`
+
+Download the Arabidopsis genome for indexing:
+
+`wget ftp://ftp.ensemblgenomes.org/pub/plants/release-50/fasta/arabidopsis_thaliana/cdna/Arabidopsis_thaliana.TAIR10.cdna.all.fa.gz`
+
 **On your local VM....**
 
 Go to the repo:
@@ -211,10 +225,19 @@ spec:
   containers:
   - name: gm-<YOUR_NAME>
 ```
+```
+    args: [ "-c", "cd /workspace/gm-<YOUR_NAME>/input && kallisto index -i /workspace/gm-<YOUR-NAME>/Arabidopsis_thaliana.TAIR10.kallisto.indexed Arabidopsis_thaliana.TAIR10.cdna.all.fa.gz" ]
+```
+```
+      persistentVolumeClaim:
+        claimName: task-pv-claim-<YOUR_NAME> # Enter valid PVC
+```
 
-Deploy the GEMMaker container:
+Deploy the GEMMaker container to index the genome:
 
 `kubectl create -f gemmaker.yaml`
+
+The pod will run non-interactively, so just confirm it deploys and runs with `kubectl get pods`
 
 **Switch tabs**
 
@@ -222,13 +245,30 @@ Deploy the GEMMaker container:
 
 **On your local VM's filesystem....**
 
+After the pod `gm-<YOUR_NAME>` has finished, deploy GEMMaker with:
 
+```
+nextflow kuberun systemsgenetics/gemmaker -r dev -profile k8s -v task-pv-claim-<YOUR-NAME> \
+--input /workspace/gm-<YOUR_NAME>/input \
+--sras /workspace/gm-<YOUR_NAME>/input/SRAs.txt \
+--outdir /workspace/gm-<YOUR_NAME>/output \
+--pipeline kallisto \
+--kallisto_index_path /workspace/gm-<YOUR_NAME>/Arabidopsis_thaliana.TAIR10.kallisto.indexed \
+--trimmomatic_clip_file /workspace/projects/systemsgenetics/gemmaker/files/fasta_adapter.txt
+```
 
+**After the workflow has completed, switch tabs to your cluster's filesystem**
 
+To view the resulting GEM:
+
+`cat /workspace/gm-<YOUR_NAME>/output/*.tpm.txt`
+
+That is all for session 1!
 
 
 
 **Enjoy your lunch! :)**
+
 
 
 # Session 2
