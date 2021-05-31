@@ -198,6 +198,65 @@ Pull the sequence: `fasterq-dump --split-files SRR5139429`
 
 ## 4. Configure GEMmaker 
 
+**On your local VM....**
+
+First, edit the file `nextflow.config.gemmaker`:
+
+`sras = "/workspace/gm-<YOUR_NAME>/input/SRAs.txt"`
+`kallisto_index_path = "/workspace/gm-<YOUR_NAME>/input/Arabidopsis_thaliana.TAIR10.kallisto.indexed"`
+`outdir = "/workspace/gm-<YOUR_NAME>/output"`
+
+Fill in the values with your name/ID.
+
+Now it is time to index a genome!
+
+### 4a. Pull Indexed Genome via Hybrid ICN
+
+**On your local VM....**
+
+Edit the file `hicn-client.yaml`:
+
+```
+metadata:
+  name: hicn-<YOUR_NAME>
+  labels:
+    app: hicn-<YOUR_NAME>
+spec:
+  containers:
+  - name: hicn-<YOUR_NAME>
+```
+```
+      persistentVolumeClaim:
+        claimName: task-pv-claim-<YOUR_NAME> # Enter valid PVC
+```
+
+Deploy the Hybrid IDN container:
+
+`kubectl create -f hicn-client.yaml`
+
+Get a terminal:
+
+`kubectl exec -ti hicn-<YOUR_NAME> -- /bin/bash`
+
+Run the setup script:
+
+`./run-setup`
+
+Create a folder for your workflow and input:
+
+`mkdir -p /workspace/gm-<YOUR_NAME>/input && cd /workspace/gm-<YOUR_NAME>/input`
+
+Download the indexed Arabidopsis genomes:
+
+`higet -O 3702.tgz - http://hicn-http-proxy/3702.tgz -P b001`
+
+Untar and move: 
+
+`tar -xvf 3702.tar && mv 3702/Arabidopsis_thaliana.TAIR10.kallisto.indexed .`
+
+
+### 4b. Manually Index Genome (optional)
+
 **On the cluster....**
 
 Create a folder for your workflow and input:
@@ -207,6 +266,25 @@ Create a folder for your workflow and input:
 Download the Arabidopsis genome for indexing:
 
 `wget ftp://ftp.ensemblgenomes.org/pub/plants/release-50/fasta/arabidopsis_thaliana/cdna/Arabidopsis_thaliana.TAIR10.cdna.all.fa.gz`
+
+Afterwards, make a file in the same folder called `SRAs.txt` with the SRA IDs of 3 Arabidopsis samples:
+
+```
+cat > /workspace/gm-<YOUR_NAME>/input/SRAs.txt << EOL
+SRR1058270
+SRR1058271
+SRR1058272
+EOL
+```
+
+Make sure it is formatted correctly!
+
+```
+# cat /workspace/gm-<YOUR_NAME>/input/SRAs.txt
+SRR1058270
+SRR1058271
+SRR1058272
+```
 
 **On your local VM....**
 
@@ -226,7 +304,7 @@ spec:
   - name: gm-<YOUR_NAME>
 ```
 ```
-    args: [ "-c", "cd /workspace/gm-<YOUR_NAME>/input && kallisto index -i /workspace/gm-<YOUR-NAME>/Arabidopsis_thaliana.TAIR10.kallisto.indexed Arabidopsis_thaliana.TAIR10.cdna.all.fa.gz" ]
+    args: [ "-c", "cd /workspace/gm-<YOUR_NAME>/input && kallisto index -i /workspace/gm-<YOUR-NAME>/input/Arabidopsis_thaliana.TAIR10.kallisto.indexed Arabidopsis_thaliana.TAIR10.cdna.all.fa.gz" ]
 ```
 ```
       persistentVolumeClaim:
@@ -245,18 +323,14 @@ The pod will run non-interactively, so just confirm it deploys and runs with `ku
 
 **On your local VM's filesystem....**
 
-After the pod `gm-<YOUR_NAME>` has finished, deploy GEMMaker with:
+After your `workspace/gm-<YOUR_NAME>/input` folder has the indexed genome and list of SRAs, deploy GEMMaker with:
 
 ```
-nextflow kuberun systemsgenetics/gemmaker -r dev -profile k8s -v task-pv-claim-<YOUR-NAME> \
---input /workspace/gm-<YOUR_NAME>/input \
---sras /workspace/gm-<YOUR_NAME>/input/SRAs.txt \
---outdir /workspace/gm-<YOUR_NAME>/output \
---pipeline kallisto \
---kallisto_index_path /workspace/gm-<YOUR_NAME>/Arabidopsis_thaliana.TAIR10.kallisto.indexed \
---trimmomatic_clip_file /workspace/projects/systemsgenetics/gemmaker/files/fasta_adapter.txt
+nextflow -C nextflow.config.gemmaker kuberun systemsgenetics/gemmaker -r dev -profile k8s -v task-pv-claim-<YOUR_NAME>
 ```
 
+## 5. View Output
+ 
 **After the workflow has completed, switch tabs to your cluster's filesystem**
 
 To view the resulting GEM:
