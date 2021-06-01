@@ -50,7 +50,7 @@ Once the Jupyter notebook is provisioned, select *Terminal* from the menu to acc
 
 Finally, please clone this repo to a folder with persistent storage:
 
-`git clone https://github.com/cbmckni/gpn-workshop.git ~/Desktop/classroom`
+`git clone https://github.com/cbmckni/gpn-workshop.git ~/Desktop/classroom/myfiles/gpn-workshop`
 
 ## 1. Access Kubernertes Cluster
 
@@ -112,9 +112,9 @@ Check that the `nfs` storage class exists:
 
 Next, deploy a 50Gb Persistant Volume Claim(PVC) to the cluster:
 
-`cd ~/Desktop/classroom/gpn-workshop`
+`cd ~/Desktop/classroom/myfiles/gpn-workshop`
 
-Edit the file and enter your name for your own PVC!
+Edit the file with `nano task-pv-claim.yaml `and enter your name for your own PVC!
 
 ```
 metadata:
@@ -150,7 +150,7 @@ Take note of the pod that gets deployed, use the name when you see **<POD_NAME>*
 
 Go to the repo:
 
-`cd ~/Desktop/classroom/gpn-workshop`
+`cd ~/Desktop/classroom/myfiles/gpn-workshop`
 
 Edit the file `sra-tools.yaml`:
 
@@ -178,7 +178,7 @@ Get the name of your pod:
 
 Get a Bash session inside your pod:
 
-`kubectl exec -ti <NAME> -- /bin/bash`
+`kubectl exec -ti sra-tools-<YOUR_NAME> -- /bin/bash`
 
 Once inside the pod, navigate to the persistent directory `/workspace`:
 
@@ -192,25 +192,57 @@ Initialize SRA-Tools:
 
 `printf '/LIBS/GUID = "%s"\n' `uuidgen` > /root/.ncbi/user-settings.mkfg`
 
-Pull the sequence: `fasterq-dump --split-files SRR5139429`
+Pull the sequence: `prefetch SRR5139429`
 
-**While the file is downloading, switch tabs to your other terminal.**
+Then, uncompress and splint into forward and reverse reads:
+
+`fasterq-dump --split-files SRR5139429/SRR5139429.sra`
+
+**While the file is downloading, create another new tab.**
 
 ## 4. Configure GEMmaker 
 
 **On your local VM....**
 
-First, edit the file `nextflow.config.gemmaker`:
+Edit the file `~/Desktop/classroom/myfiles/gpn-workshop/nextflow.config.gemmaker`:
 
-`sras = "/workspace/gm-<YOUR_NAME>/input/SRAs.txt"`
-`kallisto_index_path = "/workspace/gm-<YOUR_NAME>/input/Arabidopsis_thaliana.TAIR10.kallisto.indexed"`
-`outdir = "/workspace/gm-<YOUR_NAME>/output"`
+```
+profiles {
+  k8s {
+      k8s {
+          workDir = "/workspace/gm-<YOUR_NAME>/work"
+          launchDir = "/workspace/gm-<YOUR_NAME>"
+      }
+      params {
+        outdir = "/workspace/gm-<YOUR_NAME>/output"
+```
 
-Fill in the values with your name/ID.
+**On the cluster....**
 
-Now it is time to index a genome!
+Create a folder for your workflow and input:
 
-### 4a. Pull Indexed Genome via Hybrid ICN
+`mkdir -p /workspace/gm-<YOUR_NAME>/input && cd /workspace/gm-<YOUR_NAME>/input`
+
+Make a file in the same folder called `SRAs.txt` with the SRA IDs of 3 Arabidopsis samples:
+
+```
+cat > /workspace/gm-<YOUR_NAME>/input/SRA_IDs.txt << EOL
+SRR1058270
+SRR1058271
+SRR1058272
+EOL
+```
+
+Make sure it is formatted correctly!
+
+```
+# cat /workspace/gm-<YOUR_NAME>/input/SRA_IDs.txt
+SRR1058270
+SRR1058271
+SRR1058272
+```
+
+### 4a. Pull Indexed Genome via Hybrid ICN (optional)
 
 **On your local VM....**
 
@@ -259,38 +291,19 @@ Untar and move:
 
 **On the cluster....**
 
-Create a folder for your workflow and input:
+Navigate to your input directory:
 
-`mkdir -p /workspace/gm-<YOUR_NAME>/input && cd /workspace/gm-<YOUR_NAME>/input`
+`cd /workspace/gm-<YOUR_NAME>/input`
 
 Download the Arabidopsis genome for indexing:
 
 `wget ftp://ftp.ensemblgenomes.org/pub/plants/release-50/fasta/arabidopsis_thaliana/cdna/Arabidopsis_thaliana.TAIR10.cdna.all.fa.gz`
 
-Afterwards, make a file in the same folder called `SRAs.txt` with the SRA IDs of 3 Arabidopsis samples:
-
-```
-cat > /workspace/gm-<YOUR_NAME>/input/SRAs.txt << EOL
-SRR1058270
-SRR1058271
-SRR1058272
-EOL
-```
-
-Make sure it is formatted correctly!
-
-```
-# cat /workspace/gm-<YOUR_NAME>/input/SRAs.txt
-SRR1058270
-SRR1058271
-SRR1058272
-```
-
 **On your local VM....**
 
 Go to the repo:
 
-`cd ~/Desktop/classroom/gpn-workshop`
+`cd ~/Desktop/classroom/myfiles/gpn-workshop`
 
 Edit the file `gemmaker.yaml`:
 
@@ -319,23 +332,29 @@ The pod will run non-interactively, so just confirm it deploys and runs with `ku
 
 **Switch tabs**
 
-## 4. Deploy GEMmaker
+## 5. Deploy GEMmaker
 
 **On your local VM's filesystem....**
 
-After your `workspace/gm-<YOUR_NAME>/input` folder has the indexed genome and list of SRAs, deploy GEMMaker with:
+`cd ~/Desktop/classroom/myfiles/gpn-workshop`
+
+Deploy GEMMaker with:
 
 ```
-nextflow -C nextflow.config.gemmaker kuberun systemsgenetics/gemmaker -r dev -profile k8s -v task-pv-claim-<YOUR_NAME>
+nextflow -C nextflow.config.gemmaker kuberun systemsgenetics/gemmaker -r dev -profile k8s -v task-pv-claim-<YOUR_NAME> --sras /workspace/gm-<YOUR_NAME>/input/SRA_IDs.txt
 ```
 
-## 5. View Output
+**If you followed steps 4a. or 4b. add the argument** 
+
+`--kallisto_index_path /workspace/gm-<YOUR_NAME>/input/Arabidopsis_thaliana.TAIR10.kallisto.indexed`
+
+## 6. View Output
  
 **After the workflow has completed, switch tabs to your cluster's filesystem**
 
 To view the resulting GEM:
 
-`cat /workspace/gm-<YOUR_NAME>/output/*.tpm.txt`
+`cat /workspace/gm-<YOUR_NAME>/output/GEMs/GEMmaker.GEM.TPM.txt`
 
 That is all for session 1!
 
@@ -379,7 +398,7 @@ Once the Jupyter notebook is provisioned, select *Terminal* from the menu to acc
 
 Finally, please clone this repo to a folder with persistent storage:
 
-`git clone https://github.com/cbmckni/gpn-workshop.git ~/Desktop/classroom`
+`git clone https://github.com/cbmckni/gpn-workshop.git ~/Desktop/classroom/myfiles/gpn-workshop`
 
 ## 1. Access Kubernertes Cluster
 
@@ -411,7 +430,7 @@ Check that the `nfs` storage class exists:
 
 Next, deploy a 50Gb Persistant Volume Claim(PVC) to the cluster:
 
-`cd ~/Desktop/classroom/gpn-workshop`
+`cd ~/Desktop/classroom/myfiles/gpn-workshop`
 
 Edit the file and enter your name for your own PVC!
 
@@ -442,7 +461,7 @@ Take note of the pod that gets deployed, use the name when you see **<POD_NAME>*
 
 Go to the repo: 
 
-`cd ~/Desktop/classroom/gpn-workshop`
+`cd ~/Desktop/classroom/myfiles/gpn-workshop`
 
 Edit the file `nextflow.config`:
 
@@ -477,7 +496,7 @@ Deploy KINC using `nextflow-kuberun`:
 
 Copy the output of KINC from the PVC to your VM:
 
-`cd ~/Desktop/classroom/gpn-workshop`
+`cd ~/Desktop/classroom/myfiles/gpn-workshop`
 
 ```
 kubectl exec <POD_NAME> -- bash -c \
@@ -490,7 +509,7 @@ Open Cytoscape. (Applications -> Other -> Cytoscape)
 
 Go to your desktop and open a file browsing window, navigate to the output folder:
 
-`cd ~/Desktop/classroom/gpn-workshop/Yeast`
+`cd ~/Desktop/classroom/myfiles/gpn-workshop/Yeast`
 
 Finally, drag the file `Yeast.coexpnet.txt` from the file browser to Cytoscape!
 

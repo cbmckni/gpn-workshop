@@ -11,16 +11,16 @@ params {
     /**
      * SAMPLES
      */
-    input = "none"
+    input = ""
     skip_samples = ""
-    sras = "/workspace/gm-<YOUR_NAME>/input/SRAs.txt"
+    sras = ""
     keep_sra = false
     keep_retrieved_fastq = false
 
     /**
      * KALLISTO PIPELINE
      */
-    kallisto_index_path = "/workspace/gm-<YOUR_NAME>/input/Arabidopsis_thaliana.TAIR10.kallisto.indexed"
+    kallisto_index_path = "/workspace/projects/systemsgenetics/gemmaker/assets/demo/references/CORG.transcripts.Kallisto.indexed"
     kallisto_keep_data = false
     kallisto_keep_counts = true
     kallisto_keep_tpm = true
@@ -58,8 +58,8 @@ params {
     /**
      * JOBS REQUEST OPTIONS
      */
-    max_cpus = 4
-    max_memory = "6.GB"
+    max_cpus = 3
+    max_memory = "8.GB"
     max_time = "72.h"
 
 
@@ -72,9 +72,9 @@ params {
     publish_multiqc_report = true
 
     /**
-     * Ouptut
+     * Output
      */
-    outdir = "/workspace/gm-<YOUR_NAME>/output"
+    outdir = ""
     publish_dir_mode = 'link'
 
     // Boilerplate options
@@ -116,18 +116,23 @@ try {
 
 profiles {
   k8s {
+      k8s {
+          workDir = "/workspace/gm-<YOUR_NAME>/work"
+          launchDir = "/workspace/gm-<YOUR_NAME>"
+      }
       params {
+        outdir = "/workspace/gm-<YOUR_NAME>/output"
         failed_run_report_template = "/workspace/projects/systemsgenetics/gemmaker/assets/failed_sra_runs.template.html"
         multiqc_config_file = "/workspace/projects/systemsgenetics/gemmaker/assets/multiqc_config.yaml"
         multiqc_custom_logo = "/workspace/projects/systemsgenetics/gemmaker/assets/systemsgenetics-gemmaker_logo.png"
-        software.trimmomatic.clip_path = "/workspace/projects/systemsgenetics/gemmaker/assets/fasta_adapter.txt"
+        trimmomatic_clip_file = "/workspace/projects/systemsgenetics/gemmaker/assets/fasta_adapter.txt"
       }
       process {
           executor = "k8s"
           cpus = 1
           memory = 1.GB
           withLabel:multithreaded {
-              cpus = 8
+              cpus = 3
               memory = 8.GB
           }
       }
