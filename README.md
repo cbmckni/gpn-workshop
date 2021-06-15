@@ -50,7 +50,7 @@ Once the Jupyter notebook is provisioned, select *Terminal* from the menu to acc
 
 Finally, please clone this repo to a folder with persistent storage:
 
-```git clone https://github.com/cbmckni/gpn-workshop.git ~/Desktop/classroom/myfiles/gpn-workshop`
+`git clone https://github.com/cbmckni/gpn-workshop.git ~/Desktop/classroom/myfiles/gpn-workshop`
 
 ## 1. Access Kubernertes Cluster
 
