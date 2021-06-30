@@ -190,7 +190,7 @@ Make a folder and enter:
 
 Initialize SRA-Tools:
 
-`printf '/LIBS/GUID = "%s"\n' \`uuidgen\` > /root/.ncbi/user-settings.mkfg`
+`printf '/LIBS/GUID = "%s"\n' 'uuidgen' > /root/.ncbi/user-settings.mkfg`
 
 Pull the sequence: `prefetch SRR5139429`
 
